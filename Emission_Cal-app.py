@@ -4,8 +4,8 @@ import content
 import processing
 import calculator
 import visualization
-import numpy as np # Keep necessary imports for potential use in other modules
-import matplotlib # Keep necessary imports for potential use in other modules
+import numpy as np 
+import matplotlib 
 
 # Set Matplotlib backend (good practice for Streamlit)
 matplotlib.use('Agg')
@@ -51,13 +51,11 @@ with tab1:
 # Tab 2: Data Preview
 with tab2:
     # We pass the file object for the Link Data for preview
-    # NOTE: 'link_osm' is the key we used in ui.py to capture the Link data file object
     processing.preview_data(inputs['link_osm'])
 
 # Tab 3: Formulas
 with tab3:
-    # FIX: We now pass BOTH the 'accuracy' settings AND the 'pollutants_available'
-    # dictionary, as required by the updated content.render_formulas function.
+    # Pass BOTH the 'accuracy' settings AND the 'pollutants_available' dictionary
     content.render_formulas(inputs['accuracy'], inputs['pollutants_available'])
 
 # Tab 4: Calculation (The Core Logic)
@@ -82,5 +80,6 @@ st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
     <p><strong>Advanced Traffic Emission Calculator v2.0</strong></p>
     <p>Built with COPERT IV, IPCC, and EPA MOVES methodologies</p>
+    <p>Standards: EEA Guidebook 2019, IPCC 2019 Guidelines, WHO Air Quality Standards</p>
 </div>
 """, unsafe_allow_html=True)
