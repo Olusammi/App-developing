@@ -72,7 +72,7 @@ def render_sidebar():
     y_min = c1.number_input("Y Min", 6.43744, format="%.5f")
     y_max = c2.number_input("Y Max", 6.46934, format="%.5f")
     tol = st.sidebar.number_input("Tolerance", 0.005, format="%.3f")
-    ncore = st.sidebar.number_input("Cores", 8, 1, 16)
+    ncore = st.sidebar.number_input("Number of Cores", min_value=1, max_value=16, value=8)
 
     return {
         "pollutants_available": pollutants_available,
