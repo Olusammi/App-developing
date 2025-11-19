@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from io import BytesIO
+import pandas as pd
 
 def load_css():
     """
@@ -45,136 +46,97 @@ def get_input_file(label, key, default_filename):
     
     if uploaded is not None:
         return uploaded
-    
-    # If nothing uploaded, look for default in the 'defaults' folder
-    default_path = os.path.join("defaults", default_filename)
-    
-    if os.path.exists(default_path):
-        # Display a subtle indicator that default data is being used
-        st.caption(f"✅ *Using default: {default_filename}*")
-        with open(default_path, "rb") as f:
-            # Read into memory to mimic a Streamlit UploadedFile
-            return BytesIO(f.read())
     else:
-        # Default file missing - this will be caught during validation in calculator.py
-        # You might want to log this or just return None
+        # In a real deployed app, you'd load from a fixed path like:
+        # with open(os.path.join("defaults", default_filename), "rb") as f:
+        #    return BytesIO(f.read())
+        
+        # Since we can't access local files, we return None and let the app
+        # handle the 'use defaults' logic by checking for None.
+        # For a Streamlit Cloud deployment, these default files MUST be bundled.
+        st.info(f"Using default file for: **{default_filename}**")
         return None
+
 
 def render_sidebar():
     """
-    Renders the sidebar components: Pollutant selection, Methodology, 
-    Accuracy settings, File uploads, and Map parameters.
-    Returns a dictionary containing all user inputs.
+    Renders the entire sidebar and gathers all user inputs and settings.
     """
+    st.sidebar.header("🛠️ Input & Settings")
+
+    # --- 1. File Uploads (Parameters) ---
+    st.sidebar.subheader("1. Emission Parameter Files (.csv)")
+    st.sidebar.info("Upload your COPERT-like parameter files or use defaults.")
     
-    # ==================== EMISSION METRICS SELECTION ====================
-    st.sidebar.header("📊 Emission Metrics Selection")
-    st.sidebar.markdown("Select which pollutants to calculate and analyze")
+    # Emission Factors
+    pc_param = get_input_file("PC Parameters", "pc_param_key", "PC_Params.csv")
+    ldv_param = get_input_file("LDV Parameters", "ldv_param_key", "LDV_Params.csv")
+    hdv_param = get_input_file("HDV Parameters", "hdv_param_key", "HDV_Params.csv")
+    moto_param = get_input_file("Motorcycle Parameters", "moto_param_key", "Moto_Params.csv")
+    
+    # Engine & Class Proportions
+    engine_cap_gas = get_input_file("Gasoline Engine Capacity Proportions", "eng_gas_key", "Engine_Gas.csv")
+    engine_cap_diesel = get_input_file("Diesel Engine Capacity Proportions", "eng_dsl_key", "Engine_Diesel.csv")
+    copert_class_gas = get_input_file("Gasoline COPERT Class Proportions", "cls_gas_key", "Class_Gas.csv")
+    copert_class_diesel = get_input_file("Diesel COPERT Class Proportions", "cls_dsl_key", "Class_Diesel.csv")
+    copert_2stroke = get_input_file("2-Stroke Moto Proportions", "moto_2s_key", "Moto_2Stroke.csv")
+    copert_4stroke = get_input_file("4-Stroke Moto Proportions", "moto_4s_key", "Moto_4Stroke.csv")
 
+    st.sidebar.markdown("---")
+
+    # --- 2. Traffic Data Uploads ---
+    st.sidebar.subheader("2. Traffic and Link Data (.txt)")
+    link_osm = st.sidebar.file_uploader("Upload Link Data (OSM_ID, Length, Flow, Speed, Proportions...)", key="link_data_key")
+    osm_file = st.sidebar.file_uploader("Upload OSM Map File (.osm)", key="osm_map_key")
+
+    st.sidebar.markdown("---")
+
+    # --- 3. Pollutant Selection ---
+    st.sidebar.subheader("3. Calculation Metrics")
     pollutants_available = {
-        "CO": {"name": "Carbon Monoxide", "unit": "g/km", "standard": "COPERT IV", "color": "#ef4444"},
-        "CO2": {"name": "Carbon Dioxide", "unit": "g/km", "standard": "IPCC", "color": "#3b82f6"},
-        "NOx": {"name": "Nitrogen Oxides", "unit": "g/km", "standard": "COPERT IV", "color": "#f59e0b"},
-        "PM": {"name": "Particulate Matter", "unit": "mg/km", "standard": "WHO", "color": "#8b5cf6"},
-        "VOC": {"name": "Volatile Organic Compounds", "unit": "g/km", "standard": "COPERT IV", "color": "#10b981"},
-        "FC": {"name": "Fuel Consumption", "unit": "L/100km", "standard": "NEDC/WLTP", "color": "#f97316"}
+        "CO": "Carbon Monoxide",
+        "CO2": "Carbon Dioxide",
+        "NOx": "Nitrogen Oxides",
+        "PM": "Particulate Matter",
+        "VOC": "Volatile Organic Compounds",
+        "FC": "Fuel Consumption (L/km)"
     }
-
+    
     selected_pollutants = st.sidebar.multiselect(
         "Select Pollutants to Calculate",
         options=list(pollutants_available.keys()),
-        default=["CO", "NOx", "PM"],
-        help="Choose one or more pollutants for emission calculation"
+        default=["CO2", "NOx", "FC", "PM"],
+        format_func=lambda x: f"{x} ({pollutants_available[x]})"
     )
-
-    # Display info about selected pollutants
-    if selected_pollutants:
-        st.sidebar.markdown("### Selected Metrics Info")
-        for pollutant in selected_pollutants:
-            info = pollutants_available[pollutant]
-            st.sidebar.markdown(f"""
-            <div style='background-color: {info['color']}22; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid {info["color"]}'>
-                <strong>{pollutant}</strong>: {info['name']}<br>
-                <small>Standard: {info['standard']}</small><br>
-                <small>Unit: {info['unit']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.sidebar.markdown("---")
-
-    # ==================== METHODOLOGY & ACCURACY ====================
-    st.sidebar.header("⚙️ Methodology & Accuracy")
     
     calculation_method = st.sidebar.selectbox(
-        "Select Calculation Standard",
-        ["COPERT IV (EU)", "IPCC Tier 2", "EPA MOVES (US)", "Hybrid (Multi-standard)"],
-        help="Choose the international standard for emission calculations"
+        "Select Base Methodology",
+        options=["COPERT IV Standard", "IPCC Fuel-Based (CO2 only)", "EPA MOVES Hybrid"],
+        index=0
     )
 
-    st.sidebar.subheader("Correction Factors")
-    include_temperature_correction = st.sidebar.checkbox("Temperature Correction", value=True)
-    include_cold_start = st.sidebar.checkbox("Cold Start Emissions", value=True)
-    include_slope_correction = st.sidebar.checkbox("Road Slope Correction", value=False)
-
-    # Conditional Sliders
-    if include_temperature_correction:
-        ambient_temp = st.sidebar.slider("Ambient Temperature (°C)", -10, 40, 25)
-    else:
-        ambient_temp = 20
-
-    if include_cold_start:
-        trip_length = st.sidebar.slider("Average Trip Length (km)", 1, 50, 10)
-    else:
-        trip_length = 10
-
-    if include_slope_correction:
-        road_slope = st.sidebar.slider("Road Slope (%)", -6, 6, 0)
-    else:
-        road_slope = 0
-
     st.sidebar.markdown("---")
 
-    # ==================== FILE UPLOADS (WITH DEFAULTS) ====================
-    st.sidebar.header("📂 Input Data")
-    st.sidebar.info("ℹ️ Default data is pre-loaded. Upload files only if you wish to override specific data.")
-
-    # Group 1: COPERT Parameters
-    with st.sidebar.expander("COPERT Parameter Files", expanded=False):
-        pc_param = get_input_file("PC Parameter CSV", 'pc', "PC_parameter.csv")
-        ldv_param = get_input_file("LDV Parameter CSV", 'ldv', "LDV_parameter.csv")
-        hdv_param = get_input_file("HDV Parameter CSV", 'hdv', "HDV_parameter.csv")
-        moto_param = get_input_file("Moto Parameter CSV", 'moto', "Moto_parameter.csv")
-
-    # Group 2: Network Data
-    with st.sidebar.expander("Network Data Files", expanded=True):
-        link_osm = get_input_file("Link OSM Data (.dat/.csv/txt)", 'link', "link_osm.dat") 
-        osm_file = get_input_file("OSM Network File (.osm)", 'osm', "selected_zone-lagos.osm")
-
-    # Group 3: Proportions
-    with st.sidebar.expander("Proportion Data Files", expanded=False):
-        engine_cap_gas = get_input_file("Engine Cap Gasoline", 'ecg', "engine_capacity_gasoline.dat")
-        engine_cap_diesel = get_input_file("Engine Cap Diesel", 'ecd', "engine_capacity_diesel.dat")
-        copert_class_gas = get_input_file("COPERT Class Gasoline", 'ccg', "copert_class_proportion_gasoline.dat")
-        copert_class_diesel = get_input_file("COPERT Class Diesel", 'ccd', "copert_class_proportion_diesel.dat")
-        copert_2stroke = get_input_file("2-Stroke Motorcycle", '2s', "copert_class_proportion_2_stroke_motorcycle_more_50.dat")
-        copert_4stroke = get_input_file("4-Stroke Motorcycle", '4s', "copert_class_proportion_4_stroke_motorcycle_50_250.dat")
-
-    st.sidebar.markdown("---")
-
-    # ==================== MAP PARAMETERS ====================
-    st.sidebar.header("🗺️ Map Parameters")
-    st.sidebar.markdown("**Domain Boundaries**")
-    col1, col2 = st.sidebar.columns(2)
+    # --- 4. Accuracy Settings ---
+    st.sidebar.subheader("4. Accuracy Corrections")
     
-    # Using keyword arguments to prevent ordering errors
-    x_min = col1.number_input("X Min (Lon)", value=3.37310, format="%.5f")
-    x_max = col2.number_input("X Max (Lon)", value=3.42430, format="%.5f")
-    y_min = col1.number_input("Y Min (Lat)", value=6.43744, format="%.5f")
-    y_max = col2.number_input("Y Max (Lat)", value=6.46934, format="%.5f")
+    include_temperature_correction = st.sidebar.checkbox("Include Temperature Correction", value=True)
+    ambient_temp = st.sidebar.slider("Ambient Temperature (°C)", min_value=-10.0, max_value=40.0, value=20.0, step=0.5, disabled=not include_temperature_correction)
+    
+    include_cold_start = st.sidebar.checkbox("Include Cold Start Emissions", value=False)
+    trip_length = st.sidebar.number_input("Average Trip Length (km)", min_value=1.0, value=7.0, disabled=not include_cold_start)
+    
+    include_slope_correction = st.sidebar.checkbox("Include Road Slope Correction", value=False)
+    road_slope = st.sidebar.slider("Average Road Slope (%)", min_value=-10.0, max_value=10.0, value=0.0, step=0.1, disabled=not include_slope_correction)
+
+    st.sidebar.markdown("---")
+    
+    # --- 5. Advanced Settings ---
+    st.sidebar.subheader("5. Advanced Solver Settings")
     
     tolerance = st.sidebar.number_input("Tolerance", value=0.005, format="%.3f")
     
-    # FIX: Explicitly setting min_value, max_value, and value to avoid StreamlitValueAboveMaxError
+    # Explicitly setting min_value, max_value, and value to avoid StreamlitValueAboveMaxError
     ncore = st.sidebar.number_input("Number of Cores", min_value=1, max_value=16, value=8)
 
     # Return all gathered inputs as a dictionary
@@ -205,11 +167,7 @@ def render_sidebar():
         "link_osm": link_osm,
         "osm_file": osm_file,
         "map_params": {
-            "xmin": x_min,
-            "xmax": x_max,
-            "ymin": y_min,
-            "ymax": y_max,
-            "tol": tolerance,
-            "ncore": ncore
+            "ncore": ncore,
+            "tolerance": tolerance
         }
     }
