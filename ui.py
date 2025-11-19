@@ -154,8 +154,8 @@ def render_sidebar():
     with st.sidebar.expander("Proportion Data Files", expanded=False):
         engine_cap_gas = get_input_file("Engine Cap Gasoline", 'ecg', "engine_capacity_gasoline.dat")
         engine_cap_diesel = get_input_file("Engine Cap Diesel", 'ecd', "engine_capacity_diesel.dat")
-        copert_class_gas = get_input_file("COPERT Class Gasoline", 'ccg', "copert_class_gasoline.dat")
-        copert_class_diesel = get_input_file("COPERT Class Diesel", 'ccd', "copert_class_diesel.dat")
+        copert_class_gas = get_input_file("COPERT Class Gasoline", 'ccg', "copert_class_proportion_gasoline.dat")
+        copert_class_diesel = get_input_file("COPERT Class Diesel", 'ccd', "copert_class_proportion_diesel.dat")
         copert_2stroke = get_input_file("2-Stroke Motorcycle", '2s', "copert_class_proportion_2_stroke_motorcycle_more_50.dat")
         copert_4stroke = get_input_file("4-Stroke Motorcycle", '4s', "copert_class_proportion_4_stroke_motorcycle_50_250.dat")
 
