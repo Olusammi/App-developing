@@ -35,39 +35,59 @@ def render_instructions():
     st.markdown("""
     1. **Upload Files or Use Defaults**: The app pre-loads standard data. You can override specific files in the sidebar.
     2. **Select Metrics**: Choose pollutants (CO, NOx, etc.) in the sidebar.
-    3. **Calculate**: Go to the **Calculate Emissions** tab and click the button.
-    4. **Analyze**: Use the Maps and Analysis tabs to view results.
+    3. **Calculate**: Go to the **Calculate Emissions** tab and click the 'Run' button.
+    4. **Analyze**: View results in the **Multi-Metric Analysis** and **Interactive Map** tabs.
+    5. **Download**: Export the full results in the **Download Results** tab.
     """)
 
-# CRITICAL FIX: The function must accept two arguments to match the call in app.py.
-def render_formulas(accuracy_settings, pollutants_available):
-    """Renders mathematical formulas based on user selection."""
-    st.header("🧮 Mathematical Formulas & Methodology")
-    st.markdown("Detailed explanation of emission calculation formulas used in this calculator")
+    st.markdown("---")
+    st.info("💡 **Link Data Format**: Expected columns include `OSM_ID`, `Length_km`, `Flow`, `Speed`, and vehicle/fuel Proportions (e.g., `Gasoline_Prop`, `PC_Prop`, `4Stroke_Prop`).")
 
-    # This selectbox uses the pollutants_available dictionary passed from app.py
-    formula_pollutant = st.selectbox("Select Pollutant for Formula Details",
-                                     list(pollutants_available.keys()))
+
+def render_formulas(accuracy_settings, pollutants_available):
+    """
+    Renders the mathematical formulas based on the selected accuracy settings.
+    """
+    st.header("🧮 Emission Formula Explanation")
+    st.markdown("Review the mathematical models used for the calculation of each pollutant.")
+
+    formula_pollutant = st.selectbox(
+        "Select Pollutant Formula to View:",
+        options=list(pollutants_available.keys()),
+        format_func=lambda x: f"{x} ({pollutants_available[x]})"
+    )
 
     st.markdown("---")
-
+    
     if formula_pollutant == "CO":
         st.subheader("🔴 Carbon Monoxide (CO) Emission Formula")
-        st.markdown("### COPERT IV Hot Emission Factor")
-        # Formula for hot emission factor (EF_hot)
-        st.latex(r'EF_{hot} = \frac{a + c \cdot V + e \cdot V^2}{1 + b \cdot V + d \cdot V^2}')
-        
-        # KEY FIX: Using the correct dictionary key 'include_cold_start'
+        # Base emission formula (g/km)
+        st.latex(r'E_{pollutant} = EF_{base}(V) \cdot E_{correction} \cdot M_{Flow} \cdot L_{km}')
+        st.markdown(r"""
+        Where:
+        - $EF_{base}(V)$: Base Emission Factor (g/km) as a function of average speed ($V$), derived from COPERT IV polynomials.
+        - $E_{correction}$: Total correction factor (Temp, Slope, Cold-Start).
+        - $M_{Flow}$: Total vehicle flow on the link.
+        - $L_{km}$: Link length in kilometers.
+        """)
+
+        # Conditional checks based on sidebar settings
         if accuracy_settings['include_cold_start']:
             st.markdown("### Cold Start Correction")
             # Formula for total emissions with cold start correction
             st.latex(r'E_{total} = E_{hot} \cdot (1 - \beta) + E_{cold} \cdot \beta')
+            st.info(f"✅ Cold-Start enabled: Avg Trip Length = {accuracy_settings['trip_length']} km")
 
     elif formula_pollutant == "CO2":
         st.subheader("🔵 Carbon Dioxide (CO₂) Emission Formula")
         st.markdown("### Fuel-Based CO₂ Calculation (IPCC)")
         # Formula for CO2 (using Fuel Consumption FC, and Carbon Factor CF)
-        st.latex(r'CO_2 = FC \cdot CF \cdot \frac{44}{12} \cdot 1000')
+        st.latex(r'CO_2\ (kg) = \sum_{F} \left(FC_{F} \cdot Density_{F} \cdot C_{Fraction} \cdot \frac{44}{12} \cdot L_{km}\right)')
+        st.markdown(r"""
+        - $FC_{F}$: Fuel Consumption (L/km) for fuel type $F$.
+        - $C_{Fraction}$: Carbon content fraction in fuel.
+        - $\frac{44}{12}$: Ratio of molecular weight of CO₂ to C.
+        """)
 
     elif formula_pollutant == "NOx":
         st.subheader("🟡 Nitrogen Oxides (NOx) Emission Formula")
@@ -77,14 +97,20 @@ def render_formulas(accuracy_settings, pollutants_available):
         # KEY FIX: Using the correct dictionary key 'include_temperature_correction'
         if accuracy_settings['include_temperature_correction']:
             t = accuracy_settings['ambient_temp']
-            st.info(f"✅ Temperature correction enabled: T = {t}°C")
+            st.info(f"✅ Temperature correction enabled: $T_{{amb}}$ = {t}°C. (k is the pollutant-specific temp constant)")
+            
+    elif formula_pollutant == "PM":
+        st.subheader("⚫ Particulate Matter (PM) Emission Formula")
+        # Formula for PM (often includes a high-speed component and is less sensitive to cold start)
+        st.latex(r'E_{PM} = EF_{base}(V) \cdot E_{Slope} \cdot M_{Flow} \cdot L_{km}')
+        
+        if accuracy_settings['include_slope_correction']:
+            s = accuracy_settings['road_slope']
+            st.info(f"✅ Slope correction enabled: $S$ = {s}%. PM is highly sensitive to road gradient.")
 
     elif formula_pollutant == "FC":
         st.subheader("🟠 Fuel Consumption Formula")
+        st.markdown("### Vehicle Specific Power (VSP) Model")
         # Formula for instantaneous Fuel Consumption
-        st.latex(r'FC = a \cdot V^2 + b \cdot V + c')
-
-    # Add other pollutants as needed...
-    
-    st.markdown("---")
-    st.info("📚 **References:** EMEP/EEA Air Pollutant Emission Inventory Guidebook 2019")
+        st.latex(r'FC = \alpha \cdot V^2 + \beta \cdot V + \gamma')
+        st.markdown("Fuel consumption (L/km) is calculated using speed polynomials specific to the vehicle class and technology.")
