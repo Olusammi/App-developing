@@ -41,20 +41,17 @@ def get_input_file(label, key, default_filename):
     """
     Creates a file uploader. If no file is uploaded, it loads the default
     file from the 'defaults' folder and returns it as a BytesIO object.
+    
+    ***FIXED: Uses st.sidebar.file_uploader to ensure widget stays in the sidebar.***
     """
-    uploaded = st.file_uploader(label, key=key)
+    uploaded = st.sidebar.file_uploader(label, key=key) # <--- THIS IS THE CRITICAL CHANGE
     
     if uploaded is not None:
         return uploaded
     else:
-        # In a real deployed app, you'd load from a fixed path like:
-        # with open(os.path.join("defaults", default_filename), "rb") as f:
-        #    return BytesIO(f.read())
-        
         # Since we can't access local files, we return None and let the app
         # handle the 'use defaults' logic by checking for None.
-        # For a Streamlit Cloud deployment, these default files MUST be bundled.
-        st.info(f"Using default file for: **{default_filename}**")
+        st.sidebar.info(f"Using default file for: **{default_filename}**")
         return None
 
 
@@ -68,7 +65,7 @@ def render_sidebar():
     st.sidebar.subheader("1. Emission Parameter Files (.csv)")
     st.sidebar.info("Upload your COPERT-like parameter files or use defaults.")
     
-    # Emission Factors
+    # All these calls will now correctly place the uploader in the sidebar
     pc_param = get_input_file("PC Parameters", "pc_param_key", "PC_Params.csv")
     ldv_param = get_input_file("LDV Parameters", "ldv_param_key", "LDV_Params.csv")
     hdv_param = get_input_file("HDV Parameters", "hdv_param_key", "HDV_Params.csv")
@@ -83,12 +80,12 @@ def render_sidebar():
     copert_4stroke = get_input_file("4-Stroke Moto Proportions", "moto_4s_key", "Moto_4Stroke.csv")
 
     st.sidebar.markdown("---")
-
+    
     # --- 2. Traffic Data Uploads ---
     st.sidebar.subheader("2. Traffic and Link Data (.txt)")
+    # These still use st.sidebar.file_uploader directly, which is correct
     link_osm = st.sidebar.file_uploader("Upload Link Data (OSM_ID, Length, Flow, Speed, Proportions...)", key="link_data_key")
     osm_file = st.sidebar.file_uploader("Upload OSM Map File (.osm)", key="osm_map_key")
-
     st.sidebar.markdown("---")
 
     # --- 3. Pollutant Selection ---
