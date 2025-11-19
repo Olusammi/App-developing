@@ -911,4 +911,5 @@ def Emission_M(self, pollutant, speed, distance, engine_type, copert_class_motor
         return distance \
             * self.EFMotorcycle(pollutant, speed, engine_type, copert_class_motorcycle, **kwargs)
     else:
+
         return 0.0
