@@ -22,7 +22,7 @@ def render_formulas(accuracy_settings):
     if pollutant == "CO":
         st.subheader("Carbon Monoxide Formula")
         st.latex(r'EF_{hot} = \frac{a + c \cdot V + e \cdot V^2}{1 + b \cdot V + d \cdot V^2}')
-        if accuracy_settings['cold_start']:
+        if accuracy_settings['include_cold_start']:
             st.latex(r'E_{total} = E_{hot} \cdot (1 - \beta) + E_{cold} \cdot \beta')
             
     elif pollutant == "NOx":
